@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1rem; color: #111827; }
+        h1 { margin-bottom: 0.5rem; }
+        p.sub { color: #4b5563; margin-top: 0; }
+        form { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem; }
+        input { padding: 0.65rem 0.75rem; font-size: 1rem; border: 1px solid #d1d5db; border-radius: 6px; }
+        button { padding: 0.7rem 1rem; font-size: 1rem; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #1d4ed8; }
+        #result { margin-top: 1.5rem; padding: 1rem; border-radius: 6px; background: #f3f4f6; display: none; }
+        #error { margin-top: 1rem; color: #b91c1c; display: none; }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>URL Shortener</h1>
+        <p class="sub">Shorten links with optional TTL and click analytics.</p>
+        <form id="post-form">
+            {% csrf_token %}
+            <input type="url" name="link" id="link" placeholder="https://example.com" required>
+            <input type="number" name="ttl_seconds" id="ttl_seconds" min="1" placeholder="Optional TTL in seconds (e.g. 3600)">
+            <button type="submit" id="shorten">Shorten</button>
+        </form>
+        <div id="error"></div>
+        <section id="result">
+            <div>Short URL: <a id="short-link" href="#" target="_blank" rel="noopener"></a></div>
+            <div style="margin-top: 0.5rem;">Analytics: <a id="analytics-link" href="#" target="_blank" rel="noopener"></a></div>
+            <div id="expiry-info" style="margin-top: 0.5rem; color: #4b5563; font-size: 0.9rem;"></div>
+        </section>
+    </main>
+
+    <script type="text/javascript">
+        document.getElementById('post-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const errorEl = document.getElementById('error');
+            const resultEl = document.getElementById('result');
+            errorEl.style.display = 'none';
+            resultEl.style.display = 'none';
+
+            const url = document.getElementById('link').value;
+            const ttlRaw = document.getElementById('ttl_seconds').value;
+            const payload = { url };
+            if (ttlRaw) {
+                payload.ttl_seconds = parseInt(ttlRaw, 10);
+            }
+
+            const resp = await fetch('/shorten', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+            if (!resp.ok) {
+                errorEl.textContent = data.error || 'Failed to shorten URL';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const shortAnchor = document.getElementById('short-link');
+            shortAnchor.href = '/' + data.key;
+            shortAnchor.textContent = data.short_url;
+
+            const analyticsAnchor = document.getElementById('analytics-link');
+            analyticsAnchor.href = '/analytics/' + data.key;
+            analyticsAnchor.textContent = '/analytics/' + data.key;
+
+            document.getElementById('expiry-info').textContent = data.expires_at
+                ? 'Expires at: ' + data.expires_at
+                : 'No expiration';
+            resultEl.style.display = 'block';
+        });
+    </script>
+</body>
+
+</html>
